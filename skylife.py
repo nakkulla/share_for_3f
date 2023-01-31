@@ -1,144 +1,178 @@
-import os
 import time
-import random
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait # available since 2.4.0
-from selenium.webdriver.support import expected_conditions as EC # available since 2.26.0
-from selenium.common.exceptions import NoSuchElementException, ElementNotInteractableException, TimeoutException
-from selenium.webdriver.chrome.options import Options
-import subprocess
-from selenium.webdriver.common.by import By
-import time, datetime
-import urllib.request
-from selenium.webdriver.support.ui import Select
-from selenium.webdriver.common.keys import Keys
-import schedule
 import sys
+sys.path.append("/home/coder/project/merged/Program")
 sys.path.append("/home/coder/project/.Resource")
-import tools
+from themore import themore, tools, Keys, WebDriverWait, EC, TimeoutException
+import schedule
 
+class enter_card_error(Exception):
+    pass
+class no_amount(Exception):
+    pass
+class login_err(Exception):
+    pass
+class skylife_err(Exception):
+    pass
 
-class themore:
+class skylife(themore):
 
-    def __init__(self):
-        chrome_path='/home/coder/chromedriver'
-        options = webdriver.ChromeOptions()
-        options.add_argument('start-minimized')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--headless')
-        options.add_argument("window-size=1400,1000")
-        self.driver = webdriver.Chrome(chrome_options=options, executable_path=chrome_path)   
-        self.wait = WebDriverWait(self.driver, 20) 
-        self.sterm = 3
-        self.lterm = 7
-        self.bot = tools.mybot(token = tools.fjson('telegram','token'), id = tools.fjson('telegram','id'))
+    def __init__(self,username):
+        super().__init__()
+        self.username = username
+        self.card_n = tools.fjson(username, 'card', 'number')
+        self.card_pwd = tools.fjson(username, 'card', 'passwd')
+        self.id = tools.fjson(username, 'skylife', 'id')
+        self.passwd = tools.fjson(username, 'skylife', 'passwd')
+        self.card_bday = tools.fjson(username, 'card', 'birthday')
+        self.card_name = tools.fjson(username, 'card', 'name')
+        self.card_valid = tools.fjson(username, 'card', 'valid')
 
-
-    def wait_by_id(self, id):
-        return self.wait.until(EC.visibility_of_element_located((By.ID, id)))
-
-    def wait_by_xpath(self, xpath):
-        return self.wait.until(EC.visibility_of_element_located((By.XPATH, xpath)))
-    
-    def wait_by_title(self, title):
-        return self.wait.until(EC.title_contains(title))
-
-    def check_id(self, id):
+    def enter_card(self, charge_rate):
         try:
-            self.driver.find_element(By.ID,id)
-        except NoSuchElementException:
-            return False
-        return True
-    
-    def skylife_enter_card(self):
+            self.wait_by_id("cardNo-1").send_keys(self.card_n[0:4])
+            self.wait_by_id("cardNo-2").send_keys(self.card_n[4:8])
+            self.wait_by_id("cardNo-3").send_keys(self.card_n[8:12])
+            self.wait_by_id("cardNo-4").send_keys(self.card_n[12:16])
+            # 년
+            self.wait_by_xpath('//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[3]/td/div/span[1]/div').click()
+            self.wait_by_xpath(f'//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[3]/td/div/span[1]/div/div[3]/div/ul/li[text()=20{self.card_valid[2:4]}]').click()
+            # 월
+            self.wait_by_xpath('//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[3]/td/div/span[2]/div/div[2]').click()
+            self.wait_by_xpath(f'//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[3]/td/div/span[2]/div/div[3]/div/ul/li[text()={self.card_valid[0:2]}]').click()
+            # 생년
+            self.wait_by_xpath('//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[4]/td/div/span[1]/div/div[2]/span').click()
+            self.wait_by_xpath(f'//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[4]/td/div/span[1]/div/div[3]/div/ul/li[text()={self.card_bday[0:4]}]').click()
+            # 월
+            self.wait_by_xpath('//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[4]/td/div/span[2]/div/div[2]/span').click()
+            self.wait_by_xpath(f'//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[4]/td/div/span[2]/div/div[3]/div/ul/li[text()={self.card_bday[4:6]}]').click()
+            # 일
+            self.wait_by_xpath('//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[4]/td/div/span[3]/div/div[2]/span').click()
+            self.wait_by_xpath(f'//*[@id="payCreditCard"]/div/div[2]/div[1]/div/table/tbody/tr[4]/td/div/span[3]/div/div[3]/div/ul/li[text()={self.card_bday[6:8]}]').click()
 
+            self.wait_by_id("monthlyCharge").send_keys(charge_rate)
+            self.wait_by_id("uPass").send_keys(self.card_pwd[:2])
 
+            time.sleep(self.sterm)
+            self.wait_by_xpath('//*[@id="payCreditCard"]/div/div[2]/div[2]/a/span').click()
+            print("card entered!")
+            time.sleep(self.sterm)
 
-    def skylife_login(self):
+        except:
+            print("error!")
+            raise enter_card_error()
 
-        self.driver.get("https://www.skylife.co.kr/member/login")
-        self.wait_by_id("uId").send_keys(tools.fjson("skylife", "id"))
-        self.wait_by_id("uPass").send_keys(tools.fjson("skylife", "passwd")+Keys.ENTER)
-        time.sleep(self.lterm)
-        try :
-            self.wait_by_title('kt Skylife - 메인')
-            return False
-        
-        except :
+        else:
+            print("purchased!")
             return True
 
-    def skylife_checker(self):
+    def login(self):
+        try :
+            self.driver.get("https://www.skylife.co.kr/member/login")
+            self.wait_by_id("uId").send_keys(self.id)
+            self.wait_by_id("uPass").send_keys(self.passwd+Keys.ENTER)
+            time.sleep(self.lterm)
+            print(self.driver.title)
 
+            if self.driver.title == 'kt Skylife - 회원':
+                self.wait_by_xpath('//*[@id="sub-contents"]/div[3]/div/div[2]/a[3]/span').click()
+                time.sleep(self.sterm)
+                print(self.driver.title)
+
+            if self.driver.title != 'kt Skylife - 메인':
+                raise login_err()
+
+        except login_err:
+            return False
+
+        else:
+            print("login finished!")
+            return True
+
+    def checker(self):
         value = self.wait_by_xpath('//*[@id="userIdDetail"]/div[1]/span/b').text.replace(',','')
         return int(value)
 
-    def skylife_main(self):
-
+    def handle_alert(self):
         try:
-            while self.skylife_login():
-                print("login failed!")
-                self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- login failed!")
+            time.sleep(self.sterm)
+            WebDriverWait(self.driver, 3).until(EC.alert_is_present())
+            alert = self.driver.switch_to.alert
+            alert.accept()
+            print("alert accepted")
 
-            print("login finished!")
+        except TimeoutException:
+            print("no alert")
 
-            self.driver.get("https://www.skylife.co.kr/my/charge/pay/unpaid")
-            if self.skylife_checker() > 5998:
-
-                self.wait_by_xpath('//*[@id="userIdDetail"]/div[4]/div[2]/a/span').click()
-                self.skylife_enter_card()
-                time.sleep(self.sterm)
-                print("card entered!")
-
-                self.wait_by_xpath('//*[@id="payCreditCard"]/div/div[2]/div[2]/a').click()
-                time.sleep(self.lterm)
-                print("purchased!")
-
+    def main(self):
+        try:
+            for _ in range(3):
                 try:
+                    for _ in range(5):
+                        if self.login() == True:
+                            break
+                        else:
+                            print("login failed!")
+                            self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- login failed! try again...")
 
-                    WebDriverWait(self.driver, 3).until(EC.alert_is_present())
-                    alert = self.driver.switch_to.alert
-                    alert.accept()
-                    print("alert accepted")
+                    self.driver.get("https://www.skylife.co.kr/my/charge/pay/unpaid")
+                    time.sleep(self.lterm)
+                    total_amount = self.checker()
+                    charge_amount = 0
 
-                except TimeoutException:
+                    if total_amount >= 5999:
+                        charge_amount = 5999
+                        self.wait_by_xpath('//*[@id="userIdDetail"]/div[4]/div[2]/a/span').click()
+                        print(f"charge {charge_amount} in {total_amount}")
+                        time.sleep(self.sterm)
+                        self.enter_card(charge_amount)
+                        time.sleep(self.sterm)
+                        self.handle_alert()
+                        time.sleep(self.sterm)
+                    elif total_amount == 0:
+                        print("billing is not ready")
+                        self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- skylife billing is not ready!")
+                    else :
+                        self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- skylife billing is less 5999!")
+                        charge_amount = total_amount
+                        self.wait_by_xpath('//*[@id="userIdDetail"]/div[4]/div[2]/a/span').click()
+                        print(f"charge {charge_amount} in {total_amount}")
+                        time.sleep(self.sterm)
+                        self.enter_card(charge_amount)
+                        time.sleep(self.sterm)
+                        self.handle_alert()
+                        time.sleep(self.sterm)
 
-                    print("no alert")
+                except enter_card_error:
+                    print("error!!!")
+                    self.driver.save_screenshot(f"/home/coder/project/phone/Data/log/skylife_enter_card_error_{self.username}.png")
+                    self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- skylife_enter_card_error occured!")
+                    self.bot.sendphoto(f"/home/coder/project/phone/Data/log/skylife_enter_card_error_{self.username}.png")
+
+                except login_err:
+                    print("login error!!!")
+                    print(inst)
+                    self.driver.save_screenshot(f"/home/coder/project/phone/Data/log/skylife_loginerr_{self.username}.png")
+                    self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- skylife_login_err_{self.username} occured!")
+                    self.bot.sendphoto(f"/home/coder/project/phone/Data/log/skylife_loginerr_{self.username}.png")
+
+                except Exception as inst:
+                    print("other error!!!")
+                    print(inst)
+                    self.driver.save_screenshot(f"/home/coder/project/phone/Data/log/skylife_error_{self.username}.png")
+                    self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- skylife_error_{self.username} occured!")
+                    self.bot.sendphoto(f"/home/coder/project/phone/Data/log/skylife_error_{self.username}.png")
                     
-                self.driver.save_screenshot("/home/coder/project/phone/Data/log/skylife_finished.png")
-                time.sleep(self.sterm)
-                print("everything finished!")
-                self.driver.quit()
-                print(time.strftime('%c', time.localtime()))
-                self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- everything finished!")
-                self.bot.sendphoto("/home/coder/project/phone/Data/log/skylife_finished.png")
-            
-            else :
+                else:
+                    self.driver.save_screenshot(f"/home/coder/project/phone/Data/log/skylife_finished_{self.username}.png")
+                    time.sleep(self.sterm)
+                    print("everything finished!")
+                    print(time.strftime('%c', time.localtime()))
+                    self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- {self.username} success!")
+                    self.bot.sendphoto(f"/home/coder/project/phone/Data/log/skylife_finished_{self.username}.png")
+                    break
+                    
+                finally:
+                    self.driver.delete_all_cookies()
 
-                self.driver.save_screenshot("/home/coder/project/phone/Data/log/skylife_finished.png")
-                time.sleep(self.sterm)
-                print("everything finished!")
-                self.driver.quit()
-                print(time.strftime('%c', time.localtime()))
-                self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- bill is not ready or less than 5999!")
-                self.bot.sendphoto("/home/coder/project/phone/Data/log/skylife_finished.png")
-
-        except Exception as inst:
-
-            print("error!!!")
-            print(inst)
-            self.driver.save_screenshot("/home/coder/project/phone/Data/log/skylife_error.png")
-            self.bot.sendmessage(f"skylife : {time.strftime('%c', time.localtime())} --- error occured!")
-            self.bot.sendphoto("/home/coder/project/phone/Data/log/skylife_error.png")
-
-def job():
-    themore().skylife_main()
-
-def run():
-    job()
-
-schedule.every().day.at("12:30").do(run)
-
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+        except:
+            raise skylife_err()
